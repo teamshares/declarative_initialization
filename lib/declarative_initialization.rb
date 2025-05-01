@@ -18,6 +18,20 @@ module DeclarativeInitialization
 
       defaults = kwargs
 
+      declared.each do |key|
+        if respond_to?(key, true)
+          __logger.warn "Method ##{key} already exists on #{self.class.name}. Skipping attr_reader generation!!"
+        else
+          attr_reader key
+        end
+      end
+
+      if respond_to?(:block, true)
+        __logger.warn "Method #block already exists on #{self.class.name}. Will NOT be able to reference a block passed to #new as #block (use @block instead)."
+      else
+        attr_reader :block
+      end
+
       define_method(:initialize) do |*given_args, **given_kwargs, &block|
         class_name = self.class.name || "Anonymous Class"
         raise ArgumentError, "[#{class_name}] Only accepts keyword arguments" unless given_args.empty?
@@ -30,17 +44,10 @@ module DeclarativeInitialization
 
         declared.each do |key|
           instance_variable_set(:"@#{key}", given_kwargs.fetch(key, defaults[key]))
-          if respond_to?(key, true)
-            __logger.warn "Method ##{key} already exists on #{self.class.name}. Skipping attr_reader generation."
-          else
-            self.class.send(:attr_reader, key)
-          end
         end
 
-        if block # Automatically record any block passed to .new as an instance variable
-          instance_variable_set(:@block, block)
-          self.class.send(:attr_reader, :block) unless respond_to?(:block)
-        end
+        # Automatically record any block passed to .new as an instance variable
+        instance_variable_set(:@block, block) if block
 
         instance_exec(&post_initialize_block) if post_initialize_block
       end
