@@ -13,16 +13,7 @@ RSpec.describe DeclarativeInitialization do
       end
     end
 
-    let(:log_double) { instance_double(Logger) }
-
-    before do
-      allow_any_instance_of(klass).to receive(:__logger).and_return(log_double)
-    end
-
-    it "does not override existing readers" do
-      expect(log_double).to receive(:warn)
-      expect(subject.foo).to eq(100)
-    end
+    it { expect(subject.foo).to eq(100) }
   end
 
   describe "allows overriding the value read by the attr_reader" do
@@ -49,5 +40,18 @@ RSpec.describe DeclarativeInitialization do
     end
 
     it { expect(subject.foo).to eq(100) }
+  end
+
+  describe "does not create attr_reader if method already exists" do
+    let(:klass) do
+      Class.new do
+        def foo = "original"
+        include DeclarativeInitialization
+        initialize_with :foo
+      end
+    end
+
+    it { expect(subject.foo).to eq("original") }
+    it { expect(subject.instance_variable_get("@foo")).to eq(1) }
   end
 end

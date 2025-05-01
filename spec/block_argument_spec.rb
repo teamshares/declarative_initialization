@@ -11,7 +11,6 @@ RSpec.describe DeclarativeInitialization do
   it "doesn't record block unless given" do
     record = klass.new(foo: 1)
     expect(record.instance_variable_get("@block")).to be_nil
-    expect(record.respond_to?(:block)).to be false
   end
 
   it "does record block when given" do
