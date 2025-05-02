@@ -42,7 +42,7 @@ module DeclarativeInitialization
     def _set_up_attribute_readers(declared)
       declared.each do |key|
         if method_defined?(key)
-          _logger.warn "[#{_class_name}] Method ##{key} already exists -- skipping attr_reader generation."
+          _logger.warn "[#{_class_name}] Method ##{key} already exists -- skipping attr_reader generation"
         else
           attr_reader key
         end
@@ -51,7 +51,8 @@ module DeclarativeInitialization
 
     def _set_up_block_reader
       if method_defined?(:block)
-        _logger.warn "[#{_class_name}] Method #block already exists -- may NOT be able to reference a block passed to #new as #block (use @block instead)."
+        _logger.warn "[#{_class_name}] Method #block already exists -- may NOT be able to reference a block " \
+                     "passed to #new as #block (use @block instead)"
       else
         attr_reader :block
       end

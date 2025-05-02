@@ -54,7 +54,9 @@ RSpec.describe DeclarativeInitialization do
 
     before do
       allow(klass).to receive(:_logger).and_return(logger)
-      expect(logger).to receive(:warn).with("[Anonymous Class] Method #foo already exists -- skipping attr_reader generation.")
+      expect(logger).to receive(:warn).with(
+        "[Anonymous Class] Method #foo already exists -- skipping attr_reader generation"
+      )
       klass.initialize_with(:foo)
     end
 
