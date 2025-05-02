@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "logger"
+
 module DeclarativeInitialization
   module ClassMethods
     # Defines an initializer expecting the specified keyword arguments.
@@ -10,8 +12,8 @@ module DeclarativeInitialization
       declared = args + kwargs.keys
       _validate_arguments!(declared)
 
-      _setup_attribute_readers(declared)
-      _setup_block_reader
+      _set_up_attribute_readers(declared)
+      _set_up_block_reader
       _define_initializer(declared, kwargs, post_initialize_block)
     end
 
@@ -30,22 +32,22 @@ module DeclarativeInitialization
     def _validate_arguments!(declared)
       return if declared.all? { |arg| arg.is_a?(Symbol) }
 
-      raise ArgumentError, "All arguments must be symbols"
+      raise ArgumentError, "[#{name}] All arguments to #initialize_with must be symbols"
     end
 
-    def _setup_attribute_readers(declared)
+    def _set_up_attribute_readers(declared)
       declared.each do |key|
         if method_defined?(key)
-          _logger.warn "Method ##{key} already exists on #{name}. Skipping attr_reader generation."
+          _logger.warn "[#{name}] Method ##{key} already exists -- skipping attr_reader generation."
         else
           attr_reader key
         end
       end
     end
 
-    def _setup_block_reader
+    def _set_up_block_reader
       if method_defined?(:block)
-        _logger.warn "Method #block already exists on #{name}. Will NOT be able to reference a block passed to #new as #block (use @block instead)."
+        _logger.warn "[#{name}] Method #block already exists -- will NOT be able to reference a block passed to #new as #block (use @block instead)."
       else
         attr_reader :block
       end

@@ -3,7 +3,6 @@
 require_relative "declarative_initialization/version"
 require_relative "declarative_initialization/class_methods"
 require_relative "declarative_initialization/instance_methods"
-require "logger"
 
 module DeclarativeInitialization
   def self.included(base)
