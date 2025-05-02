@@ -19,6 +19,10 @@ module DeclarativeInitialization
 
     private
 
+    def _class_name
+      name || "Anonymous Class"
+    end
+
     def _logger
       @_logger ||= if defined?(Rails) && Rails.respond_to?(:logger)
                      Rails.logger
@@ -32,13 +36,13 @@ module DeclarativeInitialization
     def _validate_arguments!(declared)
       return if declared.all? { |arg| arg.is_a?(Symbol) }
 
-      raise ArgumentError, "[#{name}] All arguments to #initialize_with must be symbols"
+      raise ArgumentError, "[#{_class_name}] All arguments to #initialize_with must be symbols"
     end
 
     def _set_up_attribute_readers(declared)
       declared.each do |key|
         if method_defined?(key)
-          _logger.warn "[#{name}] Method ##{key} already exists -- skipping attr_reader generation."
+          _logger.warn "[#{_class_name}] Method ##{key} already exists -- skipping attr_reader generation."
         else
           attr_reader key
         end
@@ -47,14 +51,14 @@ module DeclarativeInitialization
 
     def _set_up_block_reader
       if method_defined?(:block)
-        _logger.warn "[#{name}] Method #block already exists -- will NOT be able to reference a block passed to #new as #block (use @block instead)."
+        _logger.warn "[#{_class_name}] Method #block already exists -- may NOT be able to reference a block passed to #new as #block (use @block instead)."
       else
         attr_reader :block
       end
     end
 
     def _define_initializer(declared, defaults, post_initialize_block)
-      define_method(:initialize) do |*given_args, **given_kwargs, &block|
+      define_method(:initialize) do |*given_args, **given_kwargs, &given_block|
         class_name = self.class.name || "Anonymous Class"
         _validate_initialization_arguments!(class_name, given_args, given_kwargs, declared, defaults)
 
@@ -62,7 +66,7 @@ module DeclarativeInitialization
           instance_variable_set(:"@#{key}", given_kwargs.fetch(key, defaults[key]))
         end
 
-        instance_variable_set(:@block, block) if block
+        instance_variable_set(:@block, given_block) if given_block
         instance_exec(&post_initialize_block) if post_initialize_block
       end
     end

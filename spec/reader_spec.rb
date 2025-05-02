@@ -42,16 +42,25 @@ RSpec.describe DeclarativeInitialization do
     it { expect(subject.foo).to eq(100) }
   end
 
-  describe "does not create attr_reader if method already exists" do
+  describe "if method already exists" do
     let(:klass) do
       Class.new do
         def foo = "original"
         include DeclarativeInitialization
-        initialize_with :foo
       end
     end
 
-    it { expect(subject.foo).to eq("original") }
-    it { expect(subject.instance_variable_get("@foo")).to eq(1) }
+    let(:logger) { instance_double(Logger) }
+
+    before do
+      allow(klass).to receive(:_logger).and_return(logger)
+      expect(logger).to receive(:warn).with("[Anonymous Class] Method #foo already exists -- skipping attr_reader generation.")
+      klass.initialize_with(:foo)
+    end
+
+    it "does not create attr_reader " do
+      expect(subject.foo).to eq("original")
+      expect(subject.instance_variable_get("@foo")).to eq(1)
+    end
   end
 end
