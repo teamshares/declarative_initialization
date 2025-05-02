@@ -19,6 +19,7 @@ RSpec.describe DeclarativeInitialization do
 
     it "overrides initialize_with from super" do
       expect { subject }.not_to raise_error
+      expect { klass.new(baz: 3, foo: 1, bar: 2) }.to raise_error(ArgumentError)
     end
   end
 

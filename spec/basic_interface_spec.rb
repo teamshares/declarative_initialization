@@ -18,19 +18,19 @@ RSpec.describe DeclarativeInitialization do
     describe "when called with missing required arguments" do
       subject { klass.new(bar: 1) }
 
-      it { expect { subject }.to raise_error(ArgumentError, "[Anonymous Class] Missing keyword arguments: foo") }
+      it { expect { subject }.to raise_error(ArgumentError, "[Anonymous Class] Missing keyword argument(s): foo") }
     end
 
     describe "when called with extra arguments" do
       subject { klass.new(foo: 1, bar: 2, baz: 3) }
 
-      it { expect { subject }.to raise_error(ArgumentError, "[Anonymous Class] Unknown keyword arguments: baz") }
+      it { expect { subject }.to raise_error(ArgumentError, "[Anonymous Class] Unknown keyword argument(s): baz") }
     end
 
     describe "when called with positional arguments" do
       subject { klass.new(1, 2) }
 
-      it { expect { subject }.to raise_error(ArgumentError, "[Anonymous Class] Only accepts keyword arguments") }
+      it { expect { subject }.to raise_error(ArgumentError, "[Anonymous Class] Only keyword arguments are accepted") }
     end
   end
 
