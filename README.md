@@ -55,7 +55,7 @@ We support that by passing an optional block to `initialize_with` -- for instanc
 
 * If a method with same name already exists, we log a warning and do not create the `attr_reader`.  In that case you'll need to reference the instance variable directly.
 
-  * Because of this, best practice when referencing variables in the post-initialize block is use `@foo` rather than relying on the `foo` attr_reader
+  * Because of this, best practice when referencing variables in the post-initialize block is to use `@foo` rather than relying on the `foo` attr_reader
 
 * Due to ruby syntax limitations, we do not support referencing other fields directly in the declaration:
 
