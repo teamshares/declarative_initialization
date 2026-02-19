@@ -22,6 +22,7 @@ Metrics/BlockLength:
   Enabled: false
 
 Metrics/MethodLength:
+  Max: 15
   AllowedMethods: [initialize, initialize_with]
 
 Metrics/AbcSize:

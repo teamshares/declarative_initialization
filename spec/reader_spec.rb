@@ -64,7 +64,7 @@ RSpec.describe DeclarativeInitialization do
 
     before do
       allow(DeclarativeInitialization::Internal).to receive(:logger).and_return(logger)
-      allow(DeclarativeInitialization::Internal).to receive(:should_warn_override?).and_return(true)
+      allow(DeclarativeInitialization::Internal).to receive(:warn_override?).and_return(true)
     end
 
     def attr_override_warning(key, location: "on this class")
