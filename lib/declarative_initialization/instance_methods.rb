@@ -4,14 +4,22 @@ module DeclarativeInitialization
   module InstanceMethods
     private
 
-    def _validate_initialization_arguments!(class_name, given_args, given_kwargs, declared, defaults)
-      raise ArgumentError, "[#{class_name}] Only keyword arguments are accepted" unless given_args.empty?
+    def _class_name
+      self.class.name || "Anonymous Class"
+    end
+
+    def _prefixed(message)
+      "[#{_class_name}] #{message}"
+    end
+
+    def _validate_initialization_arguments!(given_args, given_kwargs, declared, defaults)
+      raise ArgumentError, _prefixed("Only keyword arguments are accepted") unless given_args.empty?
 
       missing = declared - given_kwargs.keys - defaults.keys
-      extra = given_kwargs.keys - declared
+      raise ArgumentError, _prefixed("Missing keyword argument(s): #{missing.join(", ")}") unless missing.empty?
 
-      raise ArgumentError, "[#{class_name}] Missing keyword argument(s): #{missing.join(", ")}" unless missing.empty?
-      raise ArgumentError, "[#{class_name}] Unknown keyword argument(s): #{extra.join(", ")}" unless extra.empty?
+      extra = given_kwargs.keys - declared
+      raise ArgumentError, _prefixed("Unknown keyword argument(s): #{extra.join(", ")}") unless extra.empty?
     end
   end
 end

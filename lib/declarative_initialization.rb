@@ -6,18 +6,10 @@ require_relative "declarative_initialization/instance_methods"
 
 module DeclarativeInitialization
   def self.included(base)
-    base.class_eval do
-      include InstanceMethods
-      extend ClassMethods
-    end
+    base.include InstanceMethods
+    base.extend ClassMethods
   end
 end
 
-# Set up an alias so you can also do `include InitializeWith`
-module InitializeWith
-  def self.included(base)
-    base.class_eval do
-      include DeclarativeInitialization
-    end
-  end
-end
+# Alias so you can also do `include InitializeWith`
+InitializeWith = DeclarativeInitialization
