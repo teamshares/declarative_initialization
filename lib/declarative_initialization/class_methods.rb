@@ -11,8 +11,8 @@ module DeclarativeInitialization
     def initialize_with(*args, **kwargs, &post_initialize_block)
       declared = args + kwargs.keys
       Internal.validate_arguments!(self, declared)
-      _set_up_attribute_readers(declared)
-      _set_up_block_reader
+      declared.each { |key| _define_reader(key) }
+      _define_reader(:block, block_reader: true)
       _define_initializer(declared, kwargs, post_initialize_block)
     end
 
@@ -22,10 +22,6 @@ module DeclarativeInitialization
       @_declarative_initialization_readers ||= Set.new
     end
 
-    def _reader_defined_by_us?(key)
-      _declarative_initialization_readers.include?(key)
-    end
-
     def _ancestor_with_reader(key)
       ancestors.drop(1).find do |ancestor|
         ancestor.instance_variable_defined?(:@_declarative_initialization_readers) &&
@@ -33,39 +29,14 @@ module DeclarativeInitialization
       end
     end
 
-    def _set_up_attribute_readers(declared)
-      declared.each { |key| _define_reader_if_needed(key) }
-    end
+    def _define_reader(key, block_reader: false)
+      return if _declarative_initialization_readers.include?(key)
+      return if _ancestor_with_reader(key)
 
-    def _set_up_block_reader
-      _define_reader_if_needed(:block, block_reader: true)
-    end
-
-    def _define_reader_if_needed(key, block_reader: false)
-      return if _skip_existing_on_this_class?(key, block_reader: block_reader)
-      return if _skip_inherited?(key, block_reader: block_reader)
+      Internal.warn_override(self, key, block_reader: block_reader) if method_defined?(key)
 
       _declarative_initialization_readers.add(key)
       attr_reader key
-    end
-
-    def _skip_existing_on_this_class?(key, block_reader:)
-      return false unless method_defined?(key, false)
-
-      unless _reader_defined_by_us?(key)
-        Internal.warn_method_exists(self, key, block_reader: block_reader)
-      end
-      true
-    end
-
-    def _skip_inherited?(key, block_reader:)
-      return false unless method_defined?(key)
-
-      unless _ancestor_with_reader(key)
-        defined_in = Internal.method_owner_name(self, key)
-        Internal.warn_method_exists(self, key, block_reader: block_reader, defined_in: defined_in)
-      end
-      true
     end
 
     def _define_initializer(declared, defaults, post_initialize_block)

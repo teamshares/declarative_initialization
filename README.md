@@ -53,17 +53,24 @@ We support that by passing an optional block to `initialize_with` -- for instanc
 
 * Accepting a block: this is handled automatically -- if a block was provided to the Foo.new call, it'll be made available as `@block`/`attr_reader :block`
 
-* If a method with the same name already exists, we log a warning and do not create the `attr_reader`. In that case you'll need to reference the instance variable directly (e.g. `@foo` instead of `foo`).
+* **Method conflicts (override by default):** If a method with the same name already exists, we **override** it with our `attr_reader` so that `foo` consistently returns the init-arg value:
 
-  * **On this class:** If you define `def foo` before calling `initialize_with :foo`, we warn and skip.
+  * **On this class:** If you define `def foo` before calling `initialize_with :foo`, we override your method. Our reader wins.
 
-  * **Inherited from an ancestor:** If a parent class defines `def foo`, we also warn and skip. This catches the case where a subclass expects `foo` to return the init value but an ancestor has a different implementation.
+  * **Inherited from an ancestor:** If a parent class defines `def foo`, we also override it. This ensures the init-arg is always accessible via `foo`.
 
-  * **Exception:** If the inherited method was created by an ancestor's `initialize_with` (i.e. our `attr_reader`), we skip silently—no warning, since the behavior is the same.
+  * **Exception:** If the inherited method was created by an ancestor's `initialize_with` (i.e. our `attr_reader`), we skip silently—no redefinition, since the behavior is the same.
 
-  * **Caution:** If the existing method doesn't read the instance variable, `@foo` is still set but calling `foo` returns something else, which can cause subtle bugs.
+  * **Optional warning:** In development/test environments (Rails) or when the logger level is DEBUG, we log a warning when overriding an existing method, so you're aware of the conflict.
 
-  * Because of this, **best practice when referencing variables in the post-initialize block is to use `@foo` rather than relying on the `foo` attr_reader**
+  * **If you need the existing method:** Use a different name for your init-arg. For example, if you use ViewComponent's `renders_one :title`, don't also use `initialize_with title: nil`—instead use `initialize_with title_content: nil`.
+
+* **User method defined after initialize_with:** If you define `def foo` _after_ calling `initialize_with :foo`, your method takes precedence (Ruby's last-definition-wins behavior). This is useful for custom transformations:
+
+  ```ruby
+  initialize_with :key
+  def key = @key.to_sym
+  ```
 
 * Due to ruby syntax limitations, we do not support referencing other fields directly in the declaration:
 

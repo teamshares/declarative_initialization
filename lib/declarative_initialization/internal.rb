@@ -8,20 +8,20 @@ module DeclarativeInitialization
   module Internal
     module_function
 
-    def class_name(klass)
-      klass.name || "Anonymous Class"
-    end
-
-    def prefixed(klass, message)
-      "[#{class_name(klass)}] #{message}"
-    end
-
     def logger
       @logger ||= if defined?(Rails) && Rails.respond_to?(:logger)
                     Rails.logger
                   else
                     Logger.new($stdout).tap { |l| l.level = Logger::WARN }
                   end
+    end
+
+    def class_name(klass)
+      klass.name || "Anonymous Class"
+    end
+
+    def prefixed(klass, message)
+      "[#{class_name(klass)}] #{message}"
     end
 
     def validate_arguments!(klass, declared)
@@ -40,25 +40,27 @@ module DeclarativeInitialization
       raise ArgumentError, prefixed(klass, "Unknown keyword argument(s): #{extra.join(", ")}") unless extra.empty?
     end
 
-    def method_owner_name(klass, key)
-      owner = klass.instance_method(key).owner
-      owner.name || "an anonymous ancestor"
+    def warn_override(klass, key, block_reader:)
+      return unless should_warn_override?
+
+      location = override_location(klass, key)
+      reader_type = block_reader ? "block" : "init-arg"
+      logger.warn prefixed(klass, "Method ##{key} already exists #{location} -- overriding with #{reader_type} reader")
     end
 
-    def warn_method_exists(klass, key, block_reader:, defined_in: nil)
-      location = defined_in ? "in #{defined_in}" : "on this class"
-      message = block_reader ? block_warning(key, location) : attr_warning(key, location)
-      logger.warn prefixed(klass, message)
+    def should_warn_override?
+      return true if defined?(Rails) && Rails.respond_to?(:env) && (Rails.env.development? || Rails.env.test?)
+
+      logger.level <= Logger::DEBUG
     end
 
-    def attr_warning(key, location)
-      "Method ##{key} already exists #{location} -- skipping attr_reader generation " \
-      "(use @#{key} in post-initialize block if you need the value passed to #new)"
-    end
-
-    def block_warning(key, location)
-      "Method ##{key} already exists #{location} -- may NOT be able to reference " \
-      "a block passed to #new as ##{key} (use @#{key} instead)"
+    def override_location(klass, key)
+      if klass.method_defined?(key, false)
+        "on this class"
+      else
+        owner = klass.instance_method(key).owner
+        "in #{owner.name || "an anonymous ancestor"}"
+      end
     end
   end
 end

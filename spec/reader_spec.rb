@@ -43,43 +43,40 @@ RSpec.describe DeclarativeInitialization do
   end
 
   # =============================================================================
-  # EXHAUSTIVE WARNING/NO-WARNING COVERAGE
+  # OVERRIDE BEHAVIOR AND OPTIONAL WARNING COVERAGE
   # =============================================================================
   #
   # Matrix of scenarios for attribute readers:
-  #   WARN cases:
+  #   OVERRIDE + OPTIONAL WARN cases:
   #     - User method on THIS class before initialize_with
   #     - User method on ANCESTOR (inherited, not our reader)
-  #   NO-WARN cases:
+  #   NO-WARN + NO-OVERRIDE cases:
   #     - Reload (we defined it on this class)
   #     - Inherited from ancestor's initialize_with (our reader)
-  #     - User method defined AFTER initialize_with (we define first)
+  #     - User method defined AFTER initialize_with (user's method wins)
   #     - No conflicting method
   #
   # Same matrix applies to :block reader
   # =============================================================================
 
-  describe "warning scenarios" do
-    let(:logger) { instance_double(Logger) }
+  describe "override and warning scenarios" do
+    let(:logger) { instance_double(Logger, level: Logger::DEBUG) }
 
     before do
       allow(DeclarativeInitialization::Internal).to receive(:logger).and_return(logger)
+      allow(DeclarativeInitialization::Internal).to receive(:should_warn_override?).and_return(true)
     end
 
-    # Helper to build warning message
-    # location: "on this class" or "in SomeClass" for inherited
-    def attr_warning(key, location: "on this class")
-      "[Anonymous Class] Method ##{key} already exists #{location} -- skipping attr_reader generation " \
-      "(use @#{key} in post-initialize block if you need the value passed to #new)"
+    def attr_override_warning(key, location: "on this class")
+      "[Anonymous Class] Method ##{key} already exists #{location} -- overriding with init-arg reader"
     end
 
-    def block_warning(location: "on this class")
-      "[Anonymous Class] Method #block already exists #{location} -- may NOT be able to reference " \
-      "a block passed to #new as #block (use @block instead)"
+    def block_override_warning(location: "on this class")
+      "[Anonymous Class] Method #block already exists #{location} -- overriding with block reader"
     end
 
     # =========================================================================
-    # WARN CASES
+    # OVERRIDE + OPTIONAL WARN CASES
     # =========================================================================
 
     describe "user method on THIS class before initialize_with" do
@@ -90,17 +87,16 @@ RSpec.describe DeclarativeInitialization do
         end
       end
 
-      it "WARNS" do
-        expect(logger).to receive(:warn).with(attr_warning(:foo))
+      it "WARNS when overriding" do
+        expect(logger).to receive(:warn).with(attr_override_warning(:foo))
         klass.initialize_with(:foo)
       end
 
-      it "skips attr_reader, @foo set but foo returns user's value" do
+      it "overrides user method, foo returns init-arg value" do
         allow(logger).to receive(:warn)
         klass.initialize_with(:foo)
         instance = klass.new(foo: 123)
-        expect(instance.foo).to eq("user-defined")
-        expect(instance.instance_variable_get("@foo")).to eq(123)
+        expect(instance.foo).to eq(123)
       end
     end
 
@@ -113,17 +109,16 @@ RSpec.describe DeclarativeInitialization do
 
       let(:klass) { Class.new(parent_klass) { include DeclarativeInitialization } }
 
-      it "WARNS with ancestor class name (anonymous)" do
-        expect(logger).to receive(:warn).with(attr_warning(:foo, location: "in an anonymous ancestor"))
+      it "WARNS when overriding with ancestor class name (anonymous)" do
+        expect(logger).to receive(:warn).with(attr_override_warning(:foo, location: "in an anonymous ancestor"))
         klass.initialize_with(:foo)
       end
 
-      it "skips attr_reader, uses inherited method" do
+      it "overrides inherited method, foo returns init-arg value" do
         allow(logger).to receive(:warn)
         klass.initialize_with(:foo)
         instance = klass.new(foo: 123)
-        expect(instance.foo).to eq("parent custom")
-        expect(instance.instance_variable_get("@foo")).to eq(123)
+        expect(instance.foo).to eq(123)
       end
     end
 
@@ -135,18 +130,17 @@ RSpec.describe DeclarativeInitialization do
         end
       end
 
-      it "WARNS with block-specific message" do
-        expect(logger).to receive(:warn).with(block_warning)
+      it "WARNS when overriding with block-specific message" do
+        expect(logger).to receive(:warn).with(block_override_warning)
         klass.initialize_with(:foo)
       end
 
-      it "uses user's #block, @block still set" do
+      it "overrides user's #block, returns block passed to new" do
         allow(logger).to receive(:warn)
         klass.initialize_with(:foo)
         my_block = proc { "test" }
         instance = klass.new(foo: 1, &my_block)
-        expect(instance.block).to eq("user block")
-        expect(instance.instance_variable_get("@block")).to eq(my_block)
+        expect(instance.block).to eq(my_block)
       end
     end
 
@@ -159,18 +153,17 @@ RSpec.describe DeclarativeInitialization do
 
       let(:klass) { Class.new(parent_klass) { include DeclarativeInitialization } }
 
-      it "WARNS with ancestor class name (anonymous)" do
-        expect(logger).to receive(:warn).with(block_warning(location: "in an anonymous ancestor"))
+      it "WARNS when overriding with ancestor class name (anonymous)" do
+        expect(logger).to receive(:warn).with(block_override_warning(location: "in an anonymous ancestor"))
         klass.initialize_with(:foo)
       end
 
-      it "uses inherited #block method" do
+      it "overrides inherited #block, returns block passed to new" do
         allow(logger).to receive(:warn)
         klass.initialize_with(:foo)
         my_block = proc { "test" }
         instance = klass.new(foo: 1, &my_block)
-        expect(instance.block).to eq("parent block")
-        expect(instance.instance_variable_get("@block")).to eq(my_block)
+        expect(instance.block).to eq(my_block)
       end
     end
 
@@ -183,17 +176,16 @@ RSpec.describe DeclarativeInitialization do
       end
 
       it "WARNS only for conflicting attribute" do
-        expect(logger).to receive(:warn).with(attr_warning(:bar)).once
+        expect(logger).to receive(:warn).with(attr_override_warning(:bar)).once
         klass.initialize_with(:foo, :bar, baz: "default")
       end
 
-      it "defines readers for non-conflicting, skips conflicting" do
+      it "overrides conflicting, all attributes return init-arg values" do
         allow(logger).to receive(:warn)
         klass.initialize_with(:foo, :bar, baz: "default")
         instance = klass.new(foo: 1, bar: 2, baz: 3)
         expect(instance.foo).to eq(1)
-        expect(instance.bar).to eq("user bar")
-        expect(instance.instance_variable_get("@bar")).to eq(2)
+        expect(instance.bar).to eq(2)
         expect(instance.baz).to eq(3)
       end
     end
@@ -335,9 +327,16 @@ RSpec.describe DeclarativeInitialization do
 
       let(:klass) { Class.new(NamedParent) { include DeclarativeInitialization } }
 
-      it "WARNS with actual class name" do
-        expect(logger).to receive(:warn).with(attr_warning(:foo, location: "in NamedParent"))
+      it "WARNS when overriding with actual class name" do
+        expect(logger).to receive(:warn).with(attr_override_warning(:foo, location: "in NamedParent"))
         klass.initialize_with(:foo)
+      end
+
+      it "overrides ancestor method, foo returns init-arg value" do
+        allow(logger).to receive(:warn)
+        klass.initialize_with(:foo)
+        instance = klass.new(foo: 123)
+        expect(instance.foo).to eq(123)
       end
     end
 
@@ -356,25 +355,24 @@ RSpec.describe DeclarativeInitialization do
 
       let(:klass) { Class.new(parent_klass) }
 
-      it "parent WARNS with grandparent class name (anonymous)" do
-        expect(logger).to receive(:warn).with(attr_warning(:foo, location: "in an anonymous ancestor"))
+      it "parent WARNS when overriding with grandparent class name (anonymous)" do
+        expect(logger).to receive(:warn).with(attr_override_warning(:foo, location: "in an anonymous ancestor"))
         parent_klass.initialize_with(:foo)
       end
 
-      it "child also WARNS with grandparent class name (anonymous)" do
+      it "child does NOT warn because parent already has our reader" do
         allow(logger).to receive(:warn)
         parent_klass.initialize_with(:foo)
-        expect(logger).to receive(:warn).with(attr_warning(:foo, location: "in an anonymous ancestor"))
+        expect(logger).not_to receive(:warn)
         klass.initialize_with(:foo, :bar)
       end
 
-      it "grandparent's method is used throughout" do
+      it "parent's reader is used, init-arg value returned" do
         allow(logger).to receive(:warn)
         parent_klass.initialize_with(:foo)
         klass.initialize_with(:foo, :bar)
         instance = klass.new(foo: 1, bar: 2)
-        expect(instance.foo).to eq("grandparent custom")
-        expect(instance.instance_variable_get("@foo")).to eq(1)
+        expect(instance.foo).to eq(1)
         expect(instance.bar).to eq(2)
       end
     end
