@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "logger"
+require "set"
 
 module DeclarativeInitialization
   module ClassMethods
@@ -39,22 +40,76 @@ module DeclarativeInitialization
       raise ArgumentError, "[#{_class_name}] All arguments to #initialize_with must be symbols"
     end
 
+    def _declarative_initialization_readers
+      @_declarative_initialization_readers ||= Set.new
+    end
+
+    def _reader_defined_by_us?(key)
+      _declarative_initialization_readers.include?(key)
+    end
+
+    def _ancestor_with_reader(key)
+      ancestors.drop(1).find do |ancestor|
+        ancestor.instance_variable_defined?(:@_declarative_initialization_readers) &&
+          ancestor.instance_variable_get(:@_declarative_initialization_readers).include?(key)
+      end
+    end
+
+    def _ancestor_name(ancestor)
+      ancestor.name || "an anonymous ancestor"
+    end
+
+    def _method_owner_name(key)
+      owner = instance_method(key).owner
+      owner.name || "an anonymous ancestor"
+    end
+
     def _set_up_attribute_readers(declared)
       declared.each do |key|
-        if method_defined?(key)
-          _logger.warn "[#{_class_name}] Method ##{key} already exists -- skipping attr_reader generation"
-        else
-          attr_reader key
-        end
+        _define_reader_if_needed(key)
       end
     end
 
     def _set_up_block_reader
-      if method_defined?(:block)
-        _logger.warn "[#{_class_name}] Method #block already exists -- may NOT be able to reference a block " \
-                     "passed to #new as #block (use @block instead)"
+      _define_reader_if_needed(:block, block_reader: true)
+    end
+
+    def _define_reader_if_needed(key, block_reader: false)
+      if method_defined?(key, false)
+        # Method defined on THIS class (not inherited)
+        if _reader_defined_by_us?(key)
+          # We defined it (e.g. reload) - silently skip
+          return
+        else
+          # User defined it on this class - warn and skip
+          _warn_method_exists(key, block_reader: block_reader)
+          return
+        end
+      elsif method_defined?(key)
+        # Method inherited - check if it's our reader or a user method
+        if _ancestor_with_reader(key)
+          # Ancestor's initialize_with defined it - skip silently (same behavior)
+          return
+        else
+          # User-defined method on ancestor - warn and skip
+          _warn_method_exists(key, block_reader: block_reader, defined_in: _method_owner_name(key))
+          return
+        end
+      end
+
+      # Method doesn't exist - define it and track
+      _declarative_initialization_readers.add(key)
+      attr_reader key
+    end
+
+    def _warn_method_exists(key, block_reader: false, defined_in: nil)
+      location = defined_in ? "in #{defined_in}" : "on this class"
+      if block_reader
+        _logger.warn "[#{_class_name}] Method ##{key} already exists #{location} -- may NOT be able to reference " \
+                     "a block passed to #new as ##{key} (use @#{key} instead)"
       else
-        attr_reader :block
+        _logger.warn "[#{_class_name}] Method ##{key} already exists #{location} -- skipping attr_reader generation " \
+                     "(use @#{key} in post-initialize block if you need the value passed to #new)"
       end
     end
 

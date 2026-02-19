@@ -53,9 +53,17 @@ We support that by passing an optional block to `initialize_with` -- for instanc
 
 * Accepting a block: this is handled automatically -- if a block was provided to the Foo.new call, it'll be made available as `@block`/`attr_reader :block`
 
-* If a method with same name already exists, we log a warning and do not create the `attr_reader`.  In that case you'll need to reference the instance variable directly.
+* If a method with the same name already exists, we log a warning and do not create the `attr_reader`. In that case you'll need to reference the instance variable directly (e.g. `@foo` instead of `foo`).
 
-  * Because of this, best practice when referencing variables in the post-initialize block is to use `@foo` rather than relying on the `foo` attr_reader
+  * **On this class:** If you define `def foo` before calling `initialize_with :foo`, we warn and skip.
+
+  * **Inherited from an ancestor:** If a parent class defines `def foo`, we also warn and skip. This catches the case where a subclass expects `foo` to return the init value but an ancestor has a different implementation.
+
+  * **Exception:** If the inherited method was created by an ancestor's `initialize_with` (i.e. our `attr_reader`), we skip silently—no warning, since the behavior is the same.
+
+  * **Caution:** If the existing method doesn't read the instance variable, `@foo` is still set but calling `foo` returns something else, which can cause subtle bugs.
+
+  * Because of this, **best practice when referencing variables in the post-initialize block is to use `@foo` rather than relying on the `foo` attr_reader**
 
 * Due to ruby syntax limitations, we do not support referencing other fields directly in the declaration:
 
