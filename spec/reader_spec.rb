@@ -62,6 +62,10 @@ RSpec.describe DeclarativeInitialization do
   describe "warning scenarios" do
     let(:logger) { instance_double(Logger) }
 
+    before do
+      allow(DeclarativeInitialization::Internal).to receive(:logger).and_return(logger)
+    end
+
     # Helper to build warning message
     # location: "on this class" or "in SomeClass" for inherited
     def attr_warning(key, location: "on this class")
@@ -72,10 +76,6 @@ RSpec.describe DeclarativeInitialization do
     def block_warning(location: "on this class")
       "[Anonymous Class] Method #block already exists #{location} -- may NOT be able to reference " \
       "a block passed to #new as #block (use @block instead)"
-    end
-
-    def ancestor_location(ancestor_name)
-      "in #{ancestor_name}"
     end
 
     # =========================================================================
@@ -89,8 +89,6 @@ RSpec.describe DeclarativeInitialization do
           include DeclarativeInitialization
         end
       end
-
-      before { allow(klass).to receive(:_logger).and_return(logger) }
 
       it "WARNS" do
         expect(logger).to receive(:warn).with(attr_warning(:foo))
@@ -115,8 +113,6 @@ RSpec.describe DeclarativeInitialization do
 
       let(:klass) { Class.new(parent_klass) { include DeclarativeInitialization } }
 
-      before { allow(klass).to receive(:_logger).and_return(logger) }
-
       it "WARNS with ancestor class name (anonymous)" do
         expect(logger).to receive(:warn).with(attr_warning(:foo, location: "in an anonymous ancestor"))
         klass.initialize_with(:foo)
@@ -138,8 +134,6 @@ RSpec.describe DeclarativeInitialization do
           include DeclarativeInitialization
         end
       end
-
-      before { allow(klass).to receive(:_logger).and_return(logger) }
 
       it "WARNS with block-specific message" do
         expect(logger).to receive(:warn).with(block_warning)
@@ -165,8 +159,6 @@ RSpec.describe DeclarativeInitialization do
 
       let(:klass) { Class.new(parent_klass) { include DeclarativeInitialization } }
 
-      before { allow(klass).to receive(:_logger).and_return(logger) }
-
       it "WARNS with ancestor class name (anonymous)" do
         expect(logger).to receive(:warn).with(block_warning(location: "in an anonymous ancestor"))
         klass.initialize_with(:foo)
@@ -189,8 +181,6 @@ RSpec.describe DeclarativeInitialization do
           include DeclarativeInitialization
         end
       end
-
-      before { allow(klass).to receive(:_logger).and_return(logger) }
 
       it "WARNS only for conflicting attribute" do
         expect(logger).to receive(:warn).with(attr_warning(:bar)).once
@@ -215,8 +205,6 @@ RSpec.describe DeclarativeInitialization do
     describe "no conflicting method (normal case)" do
       let(:klass) { Class.new { include DeclarativeInitialization } }
 
-      before { allow(klass).to receive(:_logger).and_return(logger) }
-
       it "does NOT warn" do
         expect(logger).not_to receive(:warn)
         klass.initialize_with(:foo, :bar, baz: "default")
@@ -240,8 +228,6 @@ RSpec.describe DeclarativeInitialization do
         end
       end
 
-      before { allow(klass).to receive(:_logger).and_return(logger) }
-
       it "does NOT warn (we define first)" do
         expect(logger).not_to receive(:warn)
       end
@@ -255,8 +241,6 @@ RSpec.describe DeclarativeInitialization do
 
     describe "reload: initialize_with called twice" do
       let(:klass) { Class.new { include DeclarativeInitialization } }
-
-      before { allow(klass).to receive(:_logger).and_return(logger) }
 
       it "does NOT warn on second call" do
         expect(logger).not_to receive(:warn)
@@ -295,8 +279,6 @@ RSpec.describe DeclarativeInitialization do
 
       let(:klass) { Class.new(parent_klass) }
 
-      before { allow(klass).to receive(:_logger).and_return(logger) }
-
       it "does NOT warn when re-declaring parent's attribute" do
         expect(logger).not_to receive(:warn)
         klass.initialize_with(:foo, :bar)
@@ -329,8 +311,6 @@ RSpec.describe DeclarativeInitialization do
 
       let(:klass) { Class.new(parent_klass) }
 
-      before { allow(klass).to receive(:_logger).and_return(logger) }
-
       it "does NOT warn when re-declaring ancestors' attributes" do
         expect(logger).not_to receive(:warn)
         klass.initialize_with(:foo, :bar, :baz)
@@ -355,8 +335,6 @@ RSpec.describe DeclarativeInitialization do
 
       let(:klass) { Class.new(NamedParent) { include DeclarativeInitialization } }
 
-      before { allow(klass).to receive(:_logger).and_return(logger) }
-
       it "WARNS with actual class name" do
         expect(logger).to receive(:warn).with(attr_warning(:foo, location: "in NamedParent"))
         klass.initialize_with(:foo)
@@ -377,28 +355,22 @@ RSpec.describe DeclarativeInitialization do
       end
 
       let(:klass) { Class.new(parent_klass) }
-      let(:parent_logger) { instance_double(Logger) }
-
-      before do
-        allow(parent_klass).to receive(:_logger).and_return(parent_logger)
-        allow(parent_logger).to receive(:warn)
-        allow(klass).to receive(:_logger).and_return(logger)
-      end
 
       it "parent WARNS with grandparent class name (anonymous)" do
-        expect(parent_logger).to receive(:warn).with(attr_warning(:foo, location: "in an anonymous ancestor"))
+        expect(logger).to receive(:warn).with(attr_warning(:foo, location: "in an anonymous ancestor"))
         parent_klass.initialize_with(:foo)
       end
 
       it "child also WARNS with grandparent class name (anonymous)" do
+        allow(logger).to receive(:warn)
         parent_klass.initialize_with(:foo)
         expect(logger).to receive(:warn).with(attr_warning(:foo, location: "in an anonymous ancestor"))
         klass.initialize_with(:foo, :bar)
       end
 
       it "grandparent's method is used throughout" do
-        parent_klass.initialize_with(:foo)
         allow(logger).to receive(:warn)
+        parent_klass.initialize_with(:foo)
         klass.initialize_with(:foo, :bar)
         instance = klass.new(foo: 1, bar: 2)
         expect(instance.foo).to eq("grandparent custom")
