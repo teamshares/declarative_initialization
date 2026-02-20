@@ -10,3 +10,7 @@ require "rubocop/rake_task"
 RuboCop::RakeTask.new
 
 task default: %i[spec rubocop]
+
+# Require default to pass before release. This relies on the default gem release task
+# (from bundler/gem_tasks) depending on "build"; default runs before build, so before push.
+Rake::Task["build"].enhance([:default])

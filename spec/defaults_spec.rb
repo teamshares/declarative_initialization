@@ -7,6 +7,7 @@ RSpec.describe DeclarativeInitialization do
     let(:klass) do
       Class.new do
         include DeclarativeInitialization
+
         initialize_with :foo, bar: foo
       end
     end
@@ -18,6 +19,7 @@ RSpec.describe DeclarativeInitialization do
     let(:klass) do
       Class.new do
         include DeclarativeInitialization
+
         initialize_with :foo, bar: nil do
           @bar ||= foo
         end

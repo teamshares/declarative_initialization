@@ -1,23 +1,14 @@
 # frozen_string_literal: true
 
 require_relative "declarative_initialization/version"
+require_relative "declarative_initialization/internal"
 require_relative "declarative_initialization/class_methods"
-require_relative "declarative_initialization/instance_methods"
 
 module DeclarativeInitialization
   def self.included(base)
-    base.class_eval do
-      include InstanceMethods
-      extend ClassMethods
-    end
+    base.extend ClassMethods
   end
 end
 
-# Set up an alias so you can also do `include InitializeWith`
-module InitializeWith
-  def self.included(base)
-    base.class_eval do
-      include DeclarativeInitialization
-    end
-  end
-end
+# Alias so you can also do `include InitializeWith`
+InitializeWith = DeclarativeInitialization

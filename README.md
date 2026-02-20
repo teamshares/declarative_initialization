@@ -1,106 +1,175 @@
 # DeclarativeInitialization
 
-Boilerplate slows down devs and irritates everyone, plus the added cruft makes it harder to scan for the actual logic in a given file.
+Declare a class’s keyword inputs once and get a keyword-only `initialize` with assignments, readers, and helpful argument errors.
 
-This is a small layer to support declarative initialization _specifically for simple keyword-based classes_.
+- **Keyword-only initializer**: rejects positional args and unknown keywords
+- **Assignments**: sets `@keyword` instance variables from declared inputs
+- **Readers**: defines `attr_reader` for each input (and a `block` reader)
+- **Defaults**: supports optional keywords with default values
+- **No dependencies**: plain Ruby (\(>= 3.0\))
+
+## When to use it
+
+Use this when you have small POROs that take keyword inputs and you’re tired of repeating the same initializer boilerplate:
+
+- **Service / command objects** that take dependencies and parameters
+- **Value objects** with a fixed set of attributes
+- **Configuration objects** with a handful of optional flags
+- **Components / presenters** that accept a stable set of inputs
+
+If you need complex inheritance initialization, multiple initializer “shapes”, or highly dynamic defaults, a handwritten `initialize` may be clearer.
+
+## Installation
+
+Add to your Gemfile:
+
+```ruby
+gem "declarative_initialization"
+```
+
+Then install:
+
+```bash
+bundle install
+```
+
+In non-Bundler contexts, require it directly:
+
+```ruby
+require "declarative_initialization"
+```
+
+## Quick start
+
+```ruby
+class UserGreeter
+  include DeclarativeInitialization
+
+  initialize_with :user
+
+  def call
+    "Hello, #{user.name}!"
+  end
+end
+
+UserGreeter.new(user: current_user).call
+# => "Hello, Alice!"
+
+UserGreeter.new
+# ArgumentError: [UserGreeter] Missing keyword argument(s): user
+
+UserGreeter.new(user: current_user, extra: true)
+# ArgumentError: [UserGreeter] Unknown keyword argument(s): extra
+```
 
 ## Usage
 
-Given a standard ruby class like so:
+### Required vs optional keywords (defaults)
+
+Declare required keywords as symbols, and optional keywords as keyword arguments:
 
 ```ruby
-class SomeObject
-  def initialize(foo:, bar:, baz: "default value")
-    @foo = foo
-    @bar = bar
-    @baz = baz
-  end
-
-  attr_reader :foo, :bar, :baz
-end
-```
-
-With this library it can be simplified to:
-
-```ruby
-class SomeObject
+class Search
   include DeclarativeInitialization
 
-  initialize_with :foo, :bar, baz: "default value"
+  initialize_with :query, limit: 10, order: :desc
+
+  def call
+    results = perform_search(query).take(limit)
+    order == :desc ? results.reverse : results
+  end
+end
+
+Search.new(query: "ruby").call
+Search.new(query: "ruby", limit: 50).call
+```
+
+### Post-initialize hook
+
+Pass a block to `initialize_with` to run code after assignments. The block runs in the instance context.
+
+```ruby
+class Rectangle
+  include DeclarativeInitialization
+
+  initialize_with :width, :height do
+    raise ArgumentError, "Dimensions must be positive" if width <= 0 || height <= 0
+    @area = width * height
+  end
+
+  attr_reader :area
 end
 ```
-## Quick note on naming
 
-The gem name is `declarative_initialization` because there's already a very outdated gem claiming the `initialize_with` name.
+### Capturing a block passed to `.new`
 
-We've set up an alias, however, so you can do either `include DeclarativeInitialization` _or_ `include InitializeWith`.
+If the caller passes a block to `.new`, it’s stored in `@block` and available via the `block` reader.
 
-FWIW in practice at Teamshares we just `include DeclarativeInitialization` in the base class for all our View Components.
+```ruby
+class Wrapper
+  include DeclarativeInitialization
 
-### Custom logic
+  initialize_with :tag
 
-Sometimes the existing `initialize` method also does other work, for instance setting initial values for additional instance variables that aren't passed in directly.
-
-We support that by passing an optional block to `initialize_with` -- for instance, in the example above if the original version also set `@bang = foo * bar`, we could support that by changing the updated version to:
-
-  ```ruby
-  initialize_with :foo, :bar, baz: "default value" do
-    @bang = @foo * @bar
+  def render
+    "<#{tag}>#{block&.call}</#{tag}>"
   end
-  ```
+end
 
-### Edge cases
+Wrapper.new(tag: "div") { "Content" }.render
+# => "<div>Content</div>"
+```
 
-* Accepting a block: this is handled automatically -- if a block was provided to the Foo.new call, it'll be made available as `@block`/`attr_reader :block`
+## Behavior notes / gotchas
 
-* If a method with same name already exists, we log a warning and do not create the `attr_reader`.  In that case you'll need to reference the instance variable directly.
+### Only keyword arguments are accepted
 
-  * Because of this, best practice when referencing variables in the post-initialize block is to use `@foo` rather than relying on the `foo` attr_reader
+The generated initializer is keyword-only. Passing positional arguments raises an `ArgumentError`.
 
-* Due to ruby syntax limitations, we do not support referencing other fields directly in the declaration:
+### Readers are public by default
 
-  * Does _not_ work:
-    ```ruby
-    initialize_with :user, company: user.employer
-    ```
-  * Workaround:
-    ```ruby
-    initialize_with :user, company: nil do
-      @company ||= @user.employer
-    end
-    ```
+Inputs are exposed with `attr_reader`. If you prefer private readers, make them private after the declaration:
 
-* If using `initialize_with` on a subclass where the superclass defines `initialize`, we will _not_ automatically call `super`, because if we do we get this `RuntimeError`:
-  > implicit argument passing of super from method defined by define_method() is not supported. Specify all arguments explicitly.
+```ruby
+class Example
+  include DeclarativeInitialization
+  initialize_with :user, admin: false
 
-* If you need to call `super` from the block passed into `initialize_with` (unusual edge case, subclass requires different arguments than parent):
+  private :user, :admin
+end
+```
 
-  * Does _not_ work (due to `instance_exec` changing execution context but _not_ the method lookup chain):
-    ```ruby
-    initialize_with :foo do
-      super(bar: 123)
-    end
-    ```
-  * Workaround _possible_ (but really, probably more understandable to just fall back to manually writing `def initialize`):
-    ```ruby
-    initialize_with :foo do
-      parent_initialize = method(:initialize).super_method
-      parent_initialize.call(bar: 123)
-    end
-    ```
+### Defaults are literal values
 
-* If you find yourself backed into a weird corner, just use a plain ole `def initialize`!  This library is meant to make the easy cases less work, but there's no requirement that you must use it for every super complex case you run into. :)
+Defaults are applied when the caller omits that keyword. For common mutable defaults (`Array`, `Hash`, `Set`, `String`), the value is duplicated per instance (shallow). If you need deeper setup (or derived values), use the post-initialize block.
 
-## Development
+### Method name conflicts
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+`initialize_with` defines readers for each declared input (and `block`). If a method with the same name already exists, it will be overridden.
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+In Rails development/test (or when your logger level allows it), the gem logs a warning when it overrides an existing method.
+
+### Referencing other inputs in defaults
+
+You can’t reference one declared input from another input’s default at declaration time:
+
+```ruby
+initialize_with :user, account: user.account # user is not available here
+```
+
+Use the post-initialize block instead:
+
+```ruby
+initialize_with :user, account: nil do
+  @account ||= user.account
+end
+```
+
+### Inheritance and `super`
+
+`initialize_with` generates an `initialize` method. If a subclass calls `initialize_with`, it replaces the parent initializer and **does not call `super`**. Prefer a single initializer per hierarchy, or avoid this gem for complex inheritance chains.
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/teamshares/declarative_initialization. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/teamshares/declarative_initialization/blob/main/CODE_OF_CONDUCT.md).
-
-## Code of Conduct
-
-Everyone interacting in the DeclarativeInitialization project's codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/teamshares/declarative_initialization/blob/main/CODE_OF_CONDUCT.md).
+- **Source**: [teamshares/declarative_initialization](https://github.com/teamshares/declarative_initialization)
+- **Code of conduct**: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)

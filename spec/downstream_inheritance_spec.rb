@@ -6,6 +6,7 @@ RSpec.describe DeclarativeInitialization do
   let(:base_klass) do
     Class.new do
       include DeclarativeInitialization
+
       initialize_with :foo, bar: "default value"
     end
   end
