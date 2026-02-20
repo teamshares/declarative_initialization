@@ -7,6 +7,7 @@ RSpec.describe DeclarativeInitialization do
     let(:klass) do
       Class.new do
         include DeclarativeInitialization
+
         initialize_with :foo
 
         def foo = @foo * 100
@@ -20,6 +21,7 @@ RSpec.describe DeclarativeInitialization do
     let(:klass) do
       Class.new do
         include DeclarativeInitialization
+
         initialize_with :foo do
           @foo *= 100
         end
@@ -33,6 +35,7 @@ RSpec.describe DeclarativeInitialization do
     let(:klass) do
       Class.new do
         include DeclarativeInitialization
+
         initialize_with :foo do
           @foo = foo * 100
         end
@@ -46,6 +49,7 @@ RSpec.describe DeclarativeInitialization do
     let(:klass) do
       Class.new do
         include DeclarativeInitialization
+
         initialize_with items: []
       end
     end
@@ -239,6 +243,7 @@ RSpec.describe DeclarativeInitialization do
       let(:klass) do
         Class.new do
           include DeclarativeInitialization
+
           initialize_with :foo
 
           def foo = "user-override-after"
@@ -290,6 +295,7 @@ RSpec.describe DeclarativeInitialization do
       let(:parent_klass) do
         Class.new do
           include DeclarativeInitialization
+
           initialize_with :foo
         end
       end
@@ -316,6 +322,7 @@ RSpec.describe DeclarativeInitialization do
       let(:grandparent_klass) do
         Class.new do
           include DeclarativeInitialization
+
           initialize_with :foo
         end
       end

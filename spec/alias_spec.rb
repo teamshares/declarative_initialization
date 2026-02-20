@@ -4,6 +4,7 @@ RSpec.describe InitializeWith do
   let(:klass) do
     Class.new do
       include InitializeWith
+
       initialize_with :foo, bar: "default value"
     end
   end
