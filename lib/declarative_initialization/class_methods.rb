@@ -42,7 +42,13 @@ module DeclarativeInitialization
       define_method(:initialize) do |*given_args, **given_kwargs, &given_block|
         Internal.validate_initialization_arguments!(self.class, given_args, given_kwargs, declared, defaults)
 
-        defaults.merge(given_kwargs).each { |key, value| instance_variable_set(:"@#{key}", value) }
+        defaults.each do |key, value|
+          next if given_kwargs.key?(key)
+
+          instance_variable_set(:"@#{key}", Internal.copy_default(value))
+        end
+
+        given_kwargs.each { |key, value| instance_variable_set(:"@#{key}", value) }
 
         instance_variable_set(:@block, given_block) if given_block
         instance_exec(&post_initialize) if post_initialize

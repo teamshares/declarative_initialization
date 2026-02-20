@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "logger"
+require "set"
 
 module DeclarativeInitialization
   # Internal helpers that don't need to be injected into user classes.
@@ -64,6 +65,24 @@ module DeclarativeInitialization
 
       owner = klass.instance_method(key).owner
       "in #{owner.name || "an anonymous ancestor"}"
+    end
+
+    # Defensive copy for common mutable default values.
+    #
+    # Defaults passed to `initialize_with` are created once at class definition
+    # time. Without copying, `[]` / `{}` / `Set.new` defaults can be shared across
+    # instances and accidentally mutated.
+    #
+    # This is intentionally shallow, and only for common core mutable types.
+    def copy_default(value)
+      return value if value.nil? || value.frozen?
+
+      case value
+      when Array, Hash, Set, String
+        value.dup
+      else
+        value
+      end
     end
   end
 end

@@ -42,6 +42,31 @@ RSpec.describe DeclarativeInitialization do
     it { expect(subject.foo).to eq(100) }
   end
 
+  describe "defaults" do
+    let(:klass) do
+      Class.new do
+        include DeclarativeInitialization
+        initialize_with items: []
+      end
+    end
+
+    it "duplicates mutable default values per instance" do
+      a = klass.new
+      b = klass.new
+
+      expect(a.items).to eq([])
+      expect(b.items).to eq([])
+      expect(a.items).not_to be(b.items)
+    end
+
+    it "does not duplicate caller-provided values" do
+      provided = []
+      instance = klass.new(items: provided)
+
+      expect(instance.items).to be(provided)
+    end
+  end
+
   # =============================================================================
   # OVERRIDE BEHAVIOR AND OPTIONAL WARNING COVERAGE
   # =============================================================================
