@@ -86,7 +86,7 @@ Search.new(query: "ruby", limit: 50).call
 
 ### Post-initialize hook
 
-Pass a block to `initialize_with` to run code after assignments. The block runs in the instance context.
+Pass a block to `initialize_with` to run code after assignments. The block runs in the instance context. You can use either the reader (e.g. `foo`) or the instance variable (`@foo`) to read values; to assign back to an attribute, assign to the instance variable (e.g. `@foo = foo.to_s`).
 
 ```ruby
 class Rectangle
