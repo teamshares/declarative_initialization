@@ -96,6 +96,19 @@ RSpec.describe DeclarativeInitialization do
       allow(DeclarativeInitialization::Internal).to receive(:warn_override?).and_return(true)
     end
 
+    describe "warn_override? with non-standard loggers (e.g. SemanticLogger)" do
+      it "does not compare symbol level with Integer (avoids ArgumentError)" do
+        semantic_logger = instance_double(Logger, level: :info)
+        allow(DeclarativeInitialization::Internal).to receive(:logger).and_return(semantic_logger)
+        allow(DeclarativeInitialization::Internal).to receive(:warn_override?).and_call_original
+        # Ensure we hit the level check (not the Rails dev/test early return)
+        rails_env = Struct.new(:development?, :test?).new(false, false)
+        stub_const("Rails", Class.new { define_singleton_method(:env) { rails_env } })
+
+        expect(DeclarativeInitialization::Internal.warn_override?).to eq(false)
+      end
+    end
+
     def attr_override_warning(key, location: "on this class")
       "[Anonymous Class] Method ##{key} already exists #{location} -- overriding with init-arg reader"
     end

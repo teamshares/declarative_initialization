@@ -2,6 +2,11 @@
 
 * N/A
 
+## [0.2.1] - 2026-02-23
+
+### Fixed
+- Avoid `ArgumentError: comparison of Symbol with 0 failed` when `Rails.logger` is wrapped by SemanticLogger (or any logger whose `level` is not an integer). Override warnings now only compare level when it is an integer.
+
 ## [0.2.0] - 2026-02-19
 
 ### Changed

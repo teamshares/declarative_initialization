@@ -57,7 +57,10 @@ module DeclarativeInitialization
     def warn_override?
       return true if defined?(Rails) && Rails.respond_to?(:env) && (Rails.env.development? || Rails.env.test?)
 
-      logger.level <= Logger::DEBUG
+      level = logger.level
+      return false unless level.is_a?(Integer)
+
+      level <= Logger::DEBUG
     end
 
     def override_location(klass, key)
